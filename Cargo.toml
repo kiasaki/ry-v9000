@@ -4,6 +4,5 @@ version = "0.1.0"
 authors = ["Frederic Gingras <frederic@gingras.cc>"]
 
 [dependencies]
-lazy_static = "*"
-regex = "0.2"
+itertools = "*"
 rustbox = "0.9"

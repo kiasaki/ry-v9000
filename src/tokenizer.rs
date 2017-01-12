@@ -24,7 +24,7 @@ pub fn format_token(t: &Token) -> String {
         Token::ParenOpen => "paren_open".to_string(),
         Token::ParenClose => "paren_close".to_string(),
         Token::Nil => "nil".to_string(),
-        Token::Bool(ref value) => format!("bool[{}]", value),
+        Token::Bool(ref v) => format!("bool[{}]", v),
         Token::Num(ref v) => format!("number[{}]", v),
         Token::Str(ref v) => format!("string[\"{}\"]", v),
         Token::Sym(ref v) => format!("symbol[{}]", v),
