@@ -1,5 +1,4 @@
 #[macro_use]
-extern crate lazy_static;
 extern crate regex;
 extern crate rustbox;
 
@@ -26,6 +25,11 @@ fn is_valid_number_char(c: char) -> bool {
     (c >= '0' && c <= '9') || c == '-' || c == '.'
 }
 
+fn is_valid_symbol_char(c: char) -> bool {
+    (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+    c == '_' || c == '-' || c == '+' || c == '*' || c == '/'
+}
+
 fn format_token(t: &Token) -> String {
     match *t {
         Token::ParenOpen => "paren_open".to_string(),
@@ -38,62 +42,159 @@ fn format_token(t: &Token) -> String {
     }
 }
 
-fn tokenize(input: String) -> Vec<Token> {
-    lazy_static! {
-        static ref NUMBER_RE: Regex = Regex::new(r"^\d+(\.\d+)?$").unwrap();
+struct Tokenizer {
+    position: usize,
+    input: String,
+    tokens: Vec<Token>,
+}
+
+impl Tokenizer {
+    fn new(input: String) -> Tokenizer {
+        Tokenizer {
+            position: 0,
+            input: input,
+            tokens: vec![],
+        }
     }
 
-    let mut tokens = vec![];
-    let mut i = 0;
+    fn push(&mut self, t: Token) {
+        self.tokens.push(t)
+    }
 
-    while i < input.len() {
-        let c = input.chars().nth(i).unwrap();
+    fn current(&self) -> Option<char> {
+        self.input.chars().nth(self.position)
+    }
+
+    fn last(&self) -> Option<char> {
+        self.input.chars().nth(self.position - 1)
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.input.chars().nth(self.position + 1)
+    }
+
+    fn backup(&mut self) -> Option<char> {
+        self.position -= 1;
+        self.current()
+    }
+
+    fn advance(&mut self) -> Option<char> {
+        self.position += 1;
+        self.current()
+    }
+}
+
+fn tokenize(input: String) -> Vec<Token> {
+    if input == "" {
+        return vec![];
+    }
+
+    let mut tokenizer = Tokenizer::new(input);
+    let mut ch = tokenizer.current();
+
+    'top: while ch.is_some() {
+        let mut c = ch.unwrap();
 
         if c == '(' || c == '[' {
-            tokens.push(Token::ParenOpen)
-        } else if c == ')' || c == ']' {
-            tokens.push(Token::ParenClose)
-        } else if is_valid_number_char(c) {
+            tokenizer.push(Token::ParenOpen);
+            ch = tokenizer.advance();
+            continue;
+        }
+        if c == ')' || c == ']' {
+            tokenizer.push(Token::ParenClose);
+            ch = tokenizer.advance();
+            continue;
+        }
+        if is_valid_number_char(c) {
             let mut value = String::new();
-            loop {
+
+            while is_valid_number_char(c) {
                 value.push(c);
-                i += 1;
-                let c = input.chars().nth(i).unwrap();
-
-                if i > input.len() || !is_valid_number_char(c) {
-                    // Backup the one char too far we went and add token
-                    i -= 1;
-
-                    // ensure the value is not just "-" which is a valid number char
-                    // but, alone, not a valid number
-                    if value == "-" {
-                        i -= 1;
-                        break;
+                match tokenizer.peek() {
+                    // Handle EOF
+                    None => {
+                        if value == "-" {
+                            ch = tokenizer.backup();
+                            c = ch.unwrap();
+                        } else {
+                            tokenizer.push(Token::Num(f64::from_str(&value).unwrap()));
+                        }
+                        break 'top;
                     }
-
-                    // TODO handle parsing error
-                    tokens.push(Token::Num(f64::from_str(&value).unwrap()));
-                    break;
+                    _ => {}
                 }
+                ch = tokenizer.advance();
+                c = ch.unwrap();
             }
-        } else if c == '"' {
+
+            if value == "-" {
+                ch = tokenizer.backup();
+                c = ch.unwrap();
+                // no contiue do that we let the symbol if handle this char
+            } else {
+                tokenizer.push(Token::Num(f64::from_str(&value).unwrap()));
+                ch = tokenizer.advance();
+                continue;
+            }
+        }
+        if c == '"' {
             let mut value = String::new();
-            loop {
-                value.push(c);
-                i += 1;
-                let c = input.chars().nth(i).unwrap();
 
-                if i > input.len() || (c == '"' && input.chars().nth(i - 1).unwrap() != '\\') {
-                    tokens.push(Token::Str(value));
-                    break;
-                }
+            // Move to 1st char after string openning ('"')
+            ch = tokenizer.advance();
+            if ch.is_none() {
+                panic!("unterminated string literal at position {}",
+                       tokenizer.position)
             }
-        };
+            let mut c = ch.unwrap();
 
-        i += 1
+            while c != '"' || (c != '"' && tokenizer.last().unwrap() == '\\') {
+                value.push(c);
+
+                match tokenizer.peek() {
+                    // Handle EOF
+                    None => panic!("unterminated string literal starting with: '{}'", value),
+                    _ => {}
+                }
+
+                ch = tokenizer.advance();
+                c = ch.unwrap();
+            }
+
+            tokenizer.push(Token::Str(value));
+            // Skip closing '"'
+            tokenizer.advance();
+            ch = tokenizer.advance();
+            continue;
+        }
+        if is_valid_symbol_char(c) {
+            let mut value = String::new();
+            let mut c = c;
+
+            while is_valid_symbol_char(c) {
+                value.push(c);
+                match tokenizer.peek() {
+                    // Handle EOF
+                    None => {
+                        tokenizer.push(Token::Sym(value));
+                        break 'top;
+                    }
+                    _ => {}
+                }
+                ch = tokenizer.advance();
+                c = ch.unwrap();
+            }
+
+            tokenizer.push(Token::Sym(value));
+            ch = tokenizer.advance();
+            continue;
+        }
+
+        // Didn't match on anything, throw away and go on
+        ch = tokenizer.advance();
     }
 
-    tokens
+    tokenizer.tokens
 }
 
 fn main() {
