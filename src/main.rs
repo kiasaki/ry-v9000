@@ -6,14 +6,12 @@ use rustbox::Key;
 use std::error::Error;
 
 use ry::tokenizer;
+use ry::ast;
 
 fn main() {
     let tokens = tokenizer::tokenize("(+ 2 (- 5 1))".to_string());
-    for t in &tokens {
-        print!("{}", tokenizer::format_token(t));
-        print!(" ");
-    }
-    println!("");
+    let ast = ast::build(tokens);
+    println!("{}", ast::format_node(ast));
 }
 
 fn rustbox_example() {
