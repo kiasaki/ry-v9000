@@ -1,16 +1,16 @@
 use std::rc::Rc;
-use itertools::Itertools;
+use std::slice::Iter;
 
 use tokenizer::Token;
 
-#[derive(Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Node {
     Nil,
     Bool(bool),
     Num(f64),
     Str(String),
     Sym(String),
-    List(Rc<Node>, Rc<Node>),
+    List(Vec<Node>),
 }
 
 pub fn node_is_nil(n: Node) -> bool {
@@ -27,27 +27,6 @@ pub fn node_is_list(n: Node) -> bool {
     }
 }
 
-pub fn list_to_vec(n: Node) -> Vec<Node> {
-    if let Node::List(ref first, ref second) = n {
-        let mut list: Vec<Node> = Vec::new();
-        list.push((**first).clone());
-
-        let mut rest = second;
-        while !node_is_nil((**rest).clone()) {
-            if let Node::List(ref first, ref second) = n {
-                list.push((**first).clone());
-                rest = second;
-            } else {
-                panic!("list_to_vec: given list had a cdr that is not nil or a list")
-            }
-        }
-
-        list
-    } else {
-        panic!("list_to_vec: given non-list node")
-    }
-}
-
 pub fn format_node(n: Node) -> String {
     match n {
         Node::Nil => "nil".to_string(),
@@ -55,34 +34,73 @@ pub fn format_node(n: Node) -> String {
         Node::Num(ref v) => format!("{}", v),
         Node::Str(ref v) => format!("\"{}\"", v),
         Node::Sym(ref v) => format!("{}", v),
-        Node::List(..) => {
-            let formated_nodes: Vec<String> = list_to_vec(n)
-                .iter()
-                .map(|v| format_node(v.clone()))
+        Node::List(ref v) => {
+            let formated_nodes: Vec<String> = v.iter()
+                .map(|n| format_node(n.clone()))
                 .collect();
             format!("({})", formated_nodes.join(" "))
         }
     }
 }
 
-fn append(n1: Node, n2: Node) -> Node {
-    if let Node::Nil = n1 {
-        Node::List(Rc::new(n2), Rc::new(Node::Nil))
-    } else {
-        Node::Nil
+struct Builder {
+    position: usize,
+    tokens: Vec<Token>,
+}
+
+impl Builder {
+    fn new(tokens: Vec<Token>) -> Builder {
+        Builder {
+            position: 0,
+            tokens: tokens,
+        }
+    }
+
+    fn build(&self) -> Result<Node, String> {
+        let mut root: Vec<Node> = vec![Node::Sym("do".to_string())];
+
+        while self.position < self.tokens.len() {
+            match self.build_node() {
+                Ok(n) => root.push(n),
+                Err(mess) => return Err(mess),
+            }
+        }
+
+        Ok::<Node, String>(Node::List(root))
+    }
+
+    fn build_node(&self) -> Result<Node, String> {
+        match self.current().unwrap() {
+            Token::Nil => Ok(Node::Nil),
+            Token::Bool(v) => Ok(Node::Bool(v)),
+            Token::Num(v) => Ok(Node::Num(v)),
+            Token::Str(v) => Ok(Node::Str(v)),
+            Token::Sym(v) => Ok(Node::Sym(v)),
+            Token::ParenOpen => {
+                let mut list_items = vec![];
+                while self.current().unwrap() != Token::ParenClose {
+                    match self.build_node() {
+                        Ok(n) => list_items.push(n),
+                        Err(mess) => return Err(mess),
+                    }
+                }
+                Ok(Node::List(list_items))
+            }
+            Token::ParenClose => {
+                Err("found closing parens not matching openning parens".to_string())
+            }
+        }
+    }
+
+    fn current(&self) -> Option<Token> {
+        if self.position < self.tokens.len() {
+            Some(self.tokens[self.position].clone())
+        } else {
+            None
+        }
     }
 }
 
-pub fn build(tokens: Vec<Token>) -> Node {
-    let mut root = Node::Nil;
-
-    for t in tokens {
-        match t {
-            Token::Nil => "nil".to_string(),
-            Token::Bool(ref v) => format!("{}", v),
-            Token::Num(ref v) => format!("{}", v),
-            Token::Str(ref v) => format!("\"{}\"", v),
-            Token::Sym(ref v) => format!("{}", v),
-        }
-    }
+pub fn build(tokens: Vec<Token>) -> Result<Node, String> {
+    Builder::new(tokens).build()
 }

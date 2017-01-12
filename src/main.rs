@@ -10,8 +10,11 @@ use ry::ast;
 
 fn main() {
     let tokens = tokenizer::tokenize("(+ 2 (- 5 1))".to_string());
-    let ast = ast::build(tokens);
-    println!("{}", ast::format_node(ast));
+
+    match ast::build(tokens) {
+        Ok(ast) => println!("{}", ast::format_node(ast)),
+        Err(mess) => println!("error: {}", mess),
+    }
 }
 
 fn rustbox_example() {

@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+#[derive(PartialEq, Debug, Clone)]
 pub enum Token {
     ParenOpen,
     ParenClose,
