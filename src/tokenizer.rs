@@ -122,7 +122,6 @@ pub fn tokenize(input: String) -> Vec<Token> {
                 // no contiue do that we let the symbol if handle this char
             } else {
                 tokenizer.push(Token::Num(f64::from_str(&value).unwrap()));
-                ch = tokenizer.advance();
                 continue;
             }
         }

@@ -9,7 +9,7 @@ use ry::tokenizer;
 use ry::ast;
 
 fn main() {
-    let tokens = tokenizer::tokenize("(+ 2 (- 5 1))".to_string());
+    let tokens = tokenizer::tokenize("1\n2 \"asd\" () (+ 2 (- 5 1))".to_string());
 
     match ast::build(tokens) {
         Ok(ast) => println!("{}", ast::format_node(ast)),

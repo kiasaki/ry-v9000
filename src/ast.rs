@@ -1,6 +1,3 @@
-use std::rc::Rc;
-use std::slice::Iter;
-
 use tokenizer::Token;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -56,7 +53,7 @@ impl Builder {
         }
     }
 
-    fn build(&self) -> Result<Node, String> {
+    fn build(&mut self) -> Result<Node, String> {
         let mut root: Vec<Node> = vec![Node::Sym("do".to_string())];
 
         while self.position < self.tokens.len() {
@@ -69,8 +66,8 @@ impl Builder {
         Ok::<Node, String>(Node::List(root))
     }
 
-    fn build_node(&self) -> Result<Node, String> {
-        match self.current().unwrap() {
+    fn build_node(&mut self) -> Result<Node, String> {
+        let result = match self.current().unwrap() {
             Token::Nil => Ok(Node::Nil),
             Token::Bool(v) => Ok(Node::Bool(v)),
             Token::Num(v) => Ok(Node::Num(v)),
@@ -78,18 +75,40 @@ impl Builder {
             Token::Sym(v) => Ok(Node::Sym(v)),
             Token::ParenOpen => {
                 let mut list_items = vec![];
-                while self.current().unwrap() != Token::ParenClose {
-                    match self.build_node() {
-                        Ok(n) => list_items.push(n),
-                        Err(mess) => return Err(mess),
-                    }
+                let starting_position = self.position;
+
+                // Skip opening parens
+                self.advance();
+
+                loop {
+                    match self.current() {
+                        Some(Token::ParenClose) => break,
+                        Some(..) => {
+                            match self.build_node() {
+                                Ok(n) => list_items.push(n),
+                                Err(mess) => return Err(mess),
+                            }
+                        }
+                        None => {
+                            return Err(format!("unmatched open parens starting at: {}",
+                                               starting_position))
+                        }
+                    };
                 }
+
                 Ok(Node::List(list_items))
             }
             Token::ParenClose => {
                 Err("found closing parens not matching openning parens".to_string())
             }
-        }
+        };
+
+        self.advance();
+        result
+    }
+
+    fn advance(&mut self) {
+        self.position += 1
     }
 
     fn current(&self) -> Option<Token> {
