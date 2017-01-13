@@ -1,4 +1,43 @@
+use std::fmt;
+
 use tokenizer::Token;
+use lisp::Environment;
+
+pub struct BuiltInFn {
+    pub name: String,
+    pub args_count: usize,
+    pub uses_rest: bool,
+    pub f: fn(&mut Environment, Vec<Node>) -> Node,
+}
+
+impl fmt::Debug for BuiltInFn {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "builtin#{}", self.name)
+    }
+}
+
+impl fmt::Display for BuiltInFn {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "builtin#{}", self.name)
+    }
+}
+
+impl PartialEq for BuiltInFn {
+    fn eq(&self, other: &BuiltInFn) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Clone for BuiltInFn {
+    fn clone(&self) -> Self {
+        BuiltInFn {
+            name: self.name.clone(),
+            args_count: self.args_count,
+            uses_rest: self.uses_rest,
+            f: self.f,
+        }
+    }
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Node {
@@ -8,6 +47,15 @@ pub enum Node {
     Str(String),
     Sym(String),
     List(Vec<Node>),
+
+    Error(String),
+    BuiltIn(BuiltInFn),
+}
+
+impl fmt::Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", format_node(self.clone()))
+    }
 }
 
 pub fn node_is_nil(n: Node) -> bool {
@@ -37,6 +85,8 @@ pub fn format_node(n: Node) -> String {
                 .collect();
             format!("({})", formated_nodes.join(" "))
         }
+        Node::Error(ref v) => format!("ERROR {}", v),
+        Node::BuiltIn(ref v) => format!("{}", v),
     }
 }
 

@@ -1,18 +1,29 @@
 extern crate rustbox;
 extern crate ry;
 
+use std::rc::Rc;
+use std::error::Error;
+
 use rustbox::{Color, RustBox};
 use rustbox::Key;
-use std::error::Error;
 
 use ry::tokenizer;
 use ry::ast;
+use ry::lisp;
+use ry::builtins;
 
 fn main() {
     let tokens = tokenizer::tokenize("1\n2 \"asd\" () (+ 2 (- 5 1))".to_string());
 
     match ast::build(tokens) {
-        Ok(ast) => println!("{}", ast::format_node(ast)),
+        Ok(ast) => {
+            println!("ast: {}", ast::format_node(ast.clone()));
+
+            let mut env =
+                lisp::Environment::new(Some(Rc::new(builtins::new_builtins_environment())));
+            let result = lisp::eval(&mut env, ast.clone());
+            println!("result: {}", ast::format_node(result))
+        }
         Err(mess) => println!("error: {}", mess),
     }
 }
