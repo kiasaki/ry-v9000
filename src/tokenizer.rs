@@ -150,8 +150,6 @@ pub fn tokenize(input: String) -> Vec<Token> {
             }
 
             tokenizer.push(Token::Str(value));
-            // Skip closing '"'
-            tokenizer.advance();
             ch = tokenizer.advance();
             continue;
         }

@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["Frederic Gingras <frederic@gingras.cc>"]
 
 [dependencies]
-itertools = "*"
+termbox-sys = "0.2.9"
 rustbox = "0.9"
